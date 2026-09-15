@@ -189,10 +189,7 @@ mod tests {
 
     #[test]
     fn two_segments_unchanged() {
-        assert_eq!(
-            strip_region_from_identifier("ACCOUNT.USER"),
-            "ACCOUNT.USER"
-        );
+        assert_eq!(strip_region_from_identifier("ACCOUNT.USER"), "ACCOUNT.USER");
     }
 
     #[test]
