@@ -125,6 +125,30 @@ fn pubkey_fingerprint(pubkey: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(hasher.finalize())
 }
 
+/// Strip cloud/region segments from an `<account>.<...>.<user>` identifier.
+///
+/// Snowflake's JWT `iss` / `sub` claims require the account-identifier portion
+/// to be either the bare account-locator (e.g. `PF52218`) or the
+/// `<orgname>-<accountname>` form — never the regionful name
+/// (`PF52218.WEST-US-2.AZURE.<USER>`). When the URL the SDK targets uses the
+/// regionful host (`<locator>.<region>.<cloud>.snowflakecomputing.com`), the
+/// caller must still pass the regionful account here so the URL stays correct,
+/// but the JWT claims must drop everything between the first segment and the
+/// final user segment.
+///
+/// Rules:
+/// - 2 segments (`<account>.<user>` or `<org>-<account>.<user>`) → unchanged.
+/// - 3+ segments → keep first (account-locator) and last (user), drop middle
+///   (`<region>` or `<region>.<cloud>`).
+fn strip_region_from_identifier(full_identifier: &str) -> String {
+    let segments: Vec<&str> = full_identifier.split('.').collect();
+    if segments.len() <= 2 {
+        full_identifier.to_owned()
+    } else {
+        format!("{}.{}", segments[0], segments[segments.len() - 1])
+    }
+}
+
 pub fn generate_jwt_token(
     private_key_pem: &str,
     // Snowflake expects uppercase <account identifier>.<username>
@@ -134,9 +158,16 @@ pub fn generate_jwt_token(
     // rsa-2048.p8 -> public key -> der bytes -> hash
     let pkey = rsa::RsaPrivateKey::from_pkcs8_pem(private_key_pem)?;
     let pubk = pkey.to_public_key().to_public_key_der()?;
+
+    // Snowflake's JWT iss/sub take the account-locator-only form even when the
+    // SDK addresses the regionful URL host; strip cloud/region segments here so
+    // legacy account-locator deployments (e.g. `pf52218.west-us-2.azure`) get
+    // an iss that Snowflake accepts.
+    let claim_identifier = strip_region_from_identifier(full_identifier);
+
     let iss = format!(
         "{}.SHA256:{}",
-        full_identifier,
+        claim_identifier,
         pubkey_fingerprint(pubk.as_bytes())
     );
 
@@ -145,9 +176,46 @@ pub fn generate_jwt_token(
 
     install_crypto_provider();
 
-    let claims = Claims::new(iss, full_identifier.to_owned(), iat, exp);
+    let claims = Claims::new(iss, claim_identifier, iat, exp);
     let ek = EncodingKey::from_rsa_der(pkey.to_pkcs1_der()?.as_bytes());
 
     let res = encode(&Header::new(Algorithm::RS256), &claims, &ek)?;
     Ok(res)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_region_from_identifier;
+
+    #[test]
+    fn two_segments_unchanged() {
+        assert_eq!(
+            strip_region_from_identifier("ACCOUNT.USER"),
+            "ACCOUNT.USER"
+        );
+    }
+
+    #[test]
+    fn org_account_form_unchanged() {
+        assert_eq!(
+            strip_region_from_identifier("MYORG-MYACCT.USER"),
+            "MYORG-MYACCT.USER"
+        );
+    }
+
+    #[test]
+    fn three_segments_region_dropped() {
+        assert_eq!(
+            strip_region_from_identifier("PF52218.WEST-US-2.USER"),
+            "PF52218.USER"
+        );
+    }
+
+    #[test]
+    fn four_segments_region_and_cloud_dropped() {
+        assert_eq!(
+            strip_region_from_identifier("PF52218.WEST-US-2.AZURE.USER"),
+            "PF52218.USER"
+        );
+    }
 }
