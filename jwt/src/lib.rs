@@ -13,6 +13,31 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use time::{Duration, OffsetDateTime};
 
+#[cfg(not(any(feature = "rust_crypto", feature = "aws_lc_rs")))]
+compile_error!(
+    "snowflake-jwt needs a crypto backend: enable either the `rust_crypto` feature \
+     (the default, pure Rust) or the `aws_lc_rs` feature."
+);
+
+/// Makes sure `jsonwebtoken` has a crypto provider to sign with.
+///
+/// `jsonwebtoken` infers the process-wide provider from its own crate features, but only when
+/// exactly one backend is enabled. Cargo features are additive, so a dependency graph that pulls
+/// this crate in twice with different backends selected ends up with both enabled, and the
+/// inference then panics on first use. Install one explicitly to keep that build working.
+///
+/// `aws_lc_rs` wins the tie: `rust_crypto` is the default feature, so a build with both enabled is
+/// one where somebody asked for `aws_lc_rs` on top of the default.
+#[cfg(all(feature = "rust_crypto", feature = "aws_lc_rs"))]
+fn install_crypto_provider() {
+    // An error means a provider was already installed; the application's own choice wins.
+    let _ = jsonwebtoken::crypto::aws_lc::DEFAULT_PROVIDER.install_default();
+}
+
+/// No-op: with a single backend enabled `jsonwebtoken` works out the provider by itself.
+#[cfg(not(all(feature = "rust_crypto", feature = "aws_lc_rs")))]
+fn install_crypto_provider() {}
+
 #[derive(Error, Debug)]
 pub enum JwtError {
     #[error(transparent)]
@@ -117,6 +142,8 @@ pub fn generate_jwt_token(
 
     let iat = OffsetDateTime::now_utc();
     let exp = iat + Duration::days(1);
+
+    install_crypto_provider();
 
     let claims = Claims::new(iss, full_identifier.to_owned(), iat, exp);
     let ek = EncodingKey::from_rsa_der(pkey.to_pkcs1_der()?.as_bytes());

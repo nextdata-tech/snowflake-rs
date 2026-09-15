@@ -12,11 +12,18 @@ license = "Apache-2.0"
 name = "snowflake-jwt"
 readme = "README.md"
 repository = "https://github.com/mycelial/snowflake-rs"
-version = "0.3.1"
+version = "0.4.0"
+
+[features]
+default = []
+# Crypto backend used to sign tokens. One of these must be enabled; if both end up
+# enabled (Cargo features are additive) `aws_lc_rs` wins.
+aws_lc_rs = ["jsonwebtoken/aws_lc_rs"]
+rust_crypto = ["jsonwebtoken/rust_crypto"]
 
 [dependencies]
 base64 = "0.22"
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 rsa = "0.9"
 serde = "1"
 sha2 = "0.10"

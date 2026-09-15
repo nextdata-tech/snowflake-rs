@@ -7,7 +7,7 @@ version = "0.1.0"
 anyhow = "1"
 arrow = { version = "57", features = ["prettyprint"] }
 dotenv = "0.15"
-snowflake-api = { path = "../../../snowflake-api" }
+snowflake-api = { path = "../../../snowflake-api", features = ["rust_crypto"] }
 
 opentelemetry = "0.27"
 opentelemetry-otlp = "0.27"

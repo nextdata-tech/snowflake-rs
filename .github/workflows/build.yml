@@ -22,6 +22,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
+          args: --workspace --features snowflake-jwt/rust_crypto,snowflake-api/rust_crypto
 
   lints:
     name: Lints
@@ -40,7 +41,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: --workspace --features snowflake-jwt/rust_crypto,snowflake-api/rust_crypto -- -D warnings
 
   macos-test:
     name: macos
@@ -53,6 +54,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --workspace --features snowflake-jwt/rust_crypto,snowflake-api/rust_crypto
 
   linux:
     strategy:
@@ -96,6 +98,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --workspace --features snowflake-jwt/rust_crypto,snowflake-api/rust_crypto
 
   windows-test:
     name: windows
@@ -108,3 +111,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --workspace --features snowflake-jwt/rust_crypto,snowflake-api/rust_crypto

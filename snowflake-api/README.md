@@ -39,8 +39,25 @@ In your Cargo.toml:
 
 ```toml
 [dependencies]
-snowflake-api = "0.7.0"
+snowflake-api = { version = "0.15", features = ["rust_crypto"] }
 ```
+
+### Crypto backend
+
+Certificate auth (the `cert-auth` feature, on by default) signs a JWT with
+[snowflake-jwt](../jwt), which needs a crypto backend. There is no default one, so any build with
+`cert-auth` enabled has to name it:
+
+- `rust_crypto` — pure Rust, so it cross-compiles without a C toolchain.
+- `aws_lc_rs` — signs with [`aws-lc-rs`](https://crates.io/crates/aws-lc-rs).
+
+```toml
+[dependencies]
+snowflake-api = { version = "0.15", features = ["aws_lc_rs"] }
+```
+
+Naming neither is a compile error; `aws_lc_rs` takes precedence if both end up enabled. A build with
+`cert-auth` switched off needs no backend at all.
 
 Check [examples](./examples) for working programs using the library.
 
