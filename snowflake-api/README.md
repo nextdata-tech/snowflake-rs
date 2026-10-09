@@ -59,6 +59,22 @@ snowflake-api = { version = "0.15", features = ["aws_lc_rs"] }
 Naming neither is a compile error; `aws_lc_rs` takes precedence if both end up enabled. A build with
 `cert-auth` switched off needs no backend at all.
 
+### Arrow version
+
+Query results are decoded into [Arrow](https://arrow.apache.org/) record batches. The Arrow version is
+selected with a feature, and exactly one has to be enabled:
+
+- `arrow-60` — on by default.
+- `arrow-59`
+
+```toml
+[dependencies]
+snowflake-api = { version = "0.15", default-features = false, features = ["cert-auth", "rust_crypto", "arrow-59"] }
+```
+
+If both end up enabled (Cargo features are additive) `arrow-60` takes precedence. Whichever version you
+select, your own `arrow` dependency has to match it to use the returned `RecordBatch` values.
+
 Check [examples](./examples) for working programs using the library.
 
 

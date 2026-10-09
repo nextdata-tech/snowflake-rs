@@ -17,6 +17,23 @@ use std::fmt::{Display, Formatter};
 use std::io;
 use std::sync::Arc;
 
+#[cfg(not(any(feature = "arrow-59", feature = "arrow-60")))]
+compile_error!("either the `arrow-59` or `arrow-60` feature must be enabled");
+
+#[cfg(feature = "arrow-60")]
+use arrow_array_60 as arrow_array;
+#[cfg(feature = "arrow-60")]
+use arrow_ipc_60 as arrow_ipc;
+#[cfg(feature = "arrow-60")]
+use arrow_schema_60 as arrow_schema;
+
+#[cfg(all(feature = "arrow-59", not(feature = "arrow-60")))]
+use arrow_array_59 as arrow_array;
+#[cfg(all(feature = "arrow-59", not(feature = "arrow-60")))]
+use arrow_ipc_59 as arrow_ipc;
+#[cfg(all(feature = "arrow-59", not(feature = "arrow-60")))]
+use arrow_schema_59 as arrow_schema;
+
 use arrow_ipc::reader::StreamReader;
 use base64::Engine;
 use bytes::{Buf, Bytes};
@@ -511,5 +528,80 @@ impl SnowflakeApi {
             .await?;
 
         Ok(resp)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_batch() -> RecordBatch {
+        let schema = Arc::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+            "col1",
+            arrow_schema::DataType::Int32,
+            false,
+        )]));
+        let array = Arc::new(arrow_array::Int32Array::from(vec![42, 43]));
+        RecordBatch::try_new(schema, vec![array]).unwrap()
+    }
+
+    fn encode_ipc(batch: &RecordBatch) -> Vec<u8> {
+        let mut buf = Vec::new();
+        {
+            let mut writer =
+                arrow_ipc::writer::StreamWriter::try_new(&mut buf, batch.schema().as_ref())
+                    .unwrap();
+            writer.write(batch).unwrap();
+            writer.finish().unwrap();
+        }
+        buf
+    }
+
+    #[test]
+    fn arrow_ipc_round_trip() {
+        let batch = sample_batch();
+        let raw = RawQueryResult::Bytes(vec![Bytes::from(encode_ipc(&batch))]);
+
+        let QueryResult::Arrow(batches) = raw.deserialize_arrow().unwrap() else {
+            panic!("expected an arrow result");
+        };
+
+        assert_eq!(batches, vec![batch]);
+    }
+
+    #[test]
+    fn chunked_arrow_is_concatenated() {
+        let first = sample_batch();
+        let second = sample_batch();
+        let raw = RawQueryResult::Bytes(vec![
+            Bytes::from(encode_ipc(&first)),
+            Bytes::from(encode_ipc(&second)),
+        ]);
+
+        let QueryResult::Arrow(batches) = raw.deserialize_arrow().unwrap() else {
+            panic!("expected an arrow result");
+        };
+
+        assert_eq!(batches, vec![first, second]);
+    }
+
+    #[test]
+    fn empty_result_stays_empty() {
+        let res = RawQueryResult::Empty.deserialize_arrow().unwrap();
+        assert!(matches!(res, QueryResult::Empty));
+    }
+
+    #[test]
+    fn json_result_passes_through() {
+        let raw = RawQueryResult::Json(JsonResult {
+            value: serde_json::json!([[42, "answer"]]),
+            schema: vec![],
+        });
+
+        let QueryResult::Json(json) = raw.deserialize_arrow().unwrap() else {
+            panic!("expected a json result");
+        };
+
+        assert_eq!(json.value, serde_json::json!([[42, "answer"]]));
     }
 }

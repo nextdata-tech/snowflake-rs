@@ -5,7 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 anyhow = "1"
-arrow = { version = "57", features = ["prettyprint"] }
+arrow = { version = "60", features = ["prettyprint"] }
 dotenv = "0.15"
 snowflake-api = { path = "../../../snowflake-api", features = ["rust_crypto"] }
 

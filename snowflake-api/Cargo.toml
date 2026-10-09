@@ -14,19 +14,26 @@ version = "0.15.0"
 [features]
 all = ["cert-auth", "polars"]
 cert-auth = ["dep:snowflake-jwt"]
-default = ["cert-auth"]
+default = ["cert-auth", "arrow-60"]
 # Crypto backend used to sign the JWT for `cert-auth`; no effect without it.
 # One of these must be enabled alongside `cert-auth`; if both end up enabled
 # (Cargo features are additive) `aws_lc_rs` wins.
 aws_lc_rs = ["snowflake-jwt?/aws_lc_rs"]
 rust_crypto = ["snowflake-jwt?/rust_crypto"]
+# Arrow implementation version. Exactly one of these should be enabled; if both
+# end up enabled (Cargo features are additive) `arrow-60` wins.
+arrow-59 = ["dep:arrow-array-59", "dep:arrow-ipc-59", "dep:arrow-schema-59"]
+arrow-60 = ["dep:arrow-array-60", "dep:arrow-ipc-60", "dep:arrow-schema-60"]
 # support for conversion of arrow and json payloads to dataframes
 polars = ["dep:polars-core", "dep:polars-io"]
 
 [dependencies]
-arrow-array = "57"
-arrow-ipc = "57"
-arrow-schema = "57"
+arrow-array-59 = { package = "arrow-array", version = "59", optional = true }
+arrow-array-60 = { package = "arrow-array", version = "60", optional = true }
+arrow-ipc-59 = { package = "arrow-ipc", version = "59", optional = true }
+arrow-ipc-60 = { package = "arrow-ipc", version = "60", optional = true }
+arrow-schema-59 = { package = "arrow-schema", version = "59", optional = true }
+arrow-schema-60 = { package = "arrow-schema", version = "60", optional = true }
 async-trait = "0.1"
 base64 = "0.22"
 bytes = "1"
@@ -61,7 +68,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [dev-dependencies]
 anyhow = "1"
-arrow = { version = "57", features = ["prettyprint"] }
+arrow = { version = "60", features = ["prettyprint"] }
 clap = { version = "4", features = ["derive"] }
 pretty_env_logger = "0.5"
 tokio = { version = "1.35", features = ["macros", "rt-multi-thread"] }
